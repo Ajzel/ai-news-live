@@ -1,36 +1,81 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🤖 AI News Live
 
-## Getting Started
+A high-performance, real-time AI news aggregator that sources data from official AI blogs, research papers, and community platforms.
 
-First, run the development server:
+## ✨ Features
 
+- **Multi-Source Aggregation**: Real-time data from OpenAI, Anthropic, Google DeepMind, ArXiv, Hacker News, and Reddit.
+- **Real-time Feed**: Powered by SWR with 5-minute polling for instant updates.
+- **SEO Optimized**: Implements Next.js ISR (Incremental Static Regeneration) for lightning-fast initial loads and high SEO scores.
+- **Robust Safeguards**:
+  - **Data Validation**: Zod schemas ensure all news items are correctly formatted.
+  - **Network Resilience**: Custom fetch wrappers with timeouts to prevent hanging requests.
+  - **Rate Limiting**: Upstash Redis implementation to protect the API from abuse.
+- **Authentication**: Secure user login and signup via Supabase.
+- **Responsive Design**: Fully mobile-responsive UI built with Tailwind CSS.
+
+## 🛠 Tech Stack
+
+### Frontend (Deployed to Vercel)
+- **Framework**: Next.js 16 (App Router)
+- **Styling**: Tailwind CSS
+- **State Management**: SWR (Stale-While-Revalidate)
+- **Auth**: Supabase Auth
+
+### Backend (Deployed to Render)
+- **Runtime**: Node.js / Express
+- **Language**: TypeScript
+- **Rate Limiting**: Upstash Redis
+- **Scraping**: Cheerio & RSS-Parser
+- **Validation**: Zod
+
+## 🏗 Architecture
+
+The project is split into two independent services to maximize scalability:
+
+1. **Backend Service**: A standalone API that handles the "heavy lifting" of scraping and normalizing data from various sources. It acts as a single source of truth for the frontend.
+2. **Frontend Service**: A lightweight Next.js application that consumes the Backend API and provides a polished user interface.
+
+## 🚀 Getting Started
+
+### Local Development
+
+**1. Backend Setup**
 ```bash
+cd backend
+npm install
+# Create a .env file based on .env.example
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+**2. Frontend Setup**
+```bash
+# In the root directory
+npm install
+# Create a .env file (see Environment Variables section)
+npm run dev
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Environment Variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+**Backend `.env`:**
+- `UPSTASH_REDIS_REST_URL`: Your Upstash Redis URL
+- `UPSTASH_REDIS_REST_TOKEN`: Your Upstash Redis Token
+- `NEWS_API_KEY`: Your NewsAPI.org key
+- `ALLOWED_ORIGINS`: `http://localhost:3000` (or your Vercel URL)
 
-## Learn More
+**Frontend `.env`:**
+- `NEXT_PUBLIC_SUPABASE_URL`: Your Supabase Project URL
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Your Supabase Anon Key
+- `NEXT_PUBLIC_BACKEND_URL`: `http://localhost:3001` (or your Render URL)
 
-To learn more about Next.js, take a look at the following resources:
+## 🚢 Deployment
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Render (Backend)
+- Root Directory: `backend`
+- Build Command: `npm install && npm run build`
+- Start Command: `npm start`
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Vercel (Frontend)
+- Framework Preset: `Next.js`
+- Root Directory: `./`
