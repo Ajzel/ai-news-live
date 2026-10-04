@@ -1,10 +1,16 @@
-import { consolidateNews } from '@/lib/scrapers/consolidate';
+import { BACKEND_URL } from '@/lib/config';
 import Feed from '@/components/feed/Feed';
 
 export const revalidate = 3600; // ISR: revalidate every hour
 
+async function getNews() {
+  const res = await fetch(`${BACKEND_URL}/news`, { next: { revalidate: 3600 } });
+  if (!res.ok) return [];
+  return res.json();
+}
+
 export default async function HomePage() {
-  const initialNews = await consolidateNews();
+  const initialNews = await getNews();
 
   return (
     <main className="min-h-screen bg-white">

@@ -7,11 +7,12 @@ import NewsCard from './NewsCard';
 import FilterBar from './FilterBar';
 import LiveIndicator from './LiveIndicator';
 import { createClient } from '@/lib/supabase';
+import { BACKEND_URL } from '@/lib/config';
 
 const fetcher = (url: string) => fetch(url).then(res => res.json());
 
 export default function Feed({ initialData }: { initialData: NewsItem[] }) {
-  const { data, mutate } = useSWR<NewsItem[]>('/api/fetch-latest', fetcher, {
+  const { data, mutate } = useSWR<NewsItem[]>(`${BACKEND_URL}/news`, fetcher, {
     fallbackData: initialData,
     refreshInterval: 300000, // 5 minutes
   });
