@@ -1,5 +1,5 @@
-import { NewsItem } from '../types';
-import { fetchWithTimeout } from '../fetch-utils';
+import { NewsItem } from '../lib/types';
+import { fetchWithTimeout } from '../lib/fetch-utils';
 
 export async function getGeneralNews(): Promise<NewsItem[]> {
   const apiKey = process.env.NEWS_API_KEY;
