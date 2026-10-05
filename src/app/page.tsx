@@ -4,9 +4,14 @@ import Feed from '@/components/feed/Feed';
 export const revalidate = 3600; // ISR: revalidate every hour
 
 async function getNews() {
-  const res = await fetch(`${BACKEND_URL}/news`, { next: { revalidate: 3600 } });
-  if (!res.ok) return [];
-  return res.json();
+  try {
+    const res = await fetch(`${BACKEND_URL}/news`, { next: { revalidate: 3600 } });
+    if (!res.ok) return [];
+    return await res.json();
+  } catch (error) {
+    console.error('Failed to fetch news:', error);
+    return [];
+  }
 }
 
 export default async function HomePage() {
