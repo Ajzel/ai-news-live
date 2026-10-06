@@ -15,7 +15,7 @@ export default function NewsCard({ item }: { item: NewsItem }) {
           {item.sourceName}
         </span>
         <span className="text-xs text-gray-500">
-          {item.publishedAt.toLocaleDateString()}
+          {new Date(item.publishedAt).toLocaleDateString('en-US')}
         </span>
       </div>
       <h3 className="text-lg font-semibold mb-2">
