@@ -49,7 +49,8 @@ async function fetchRssFeed(feed: { name: string; url: string; category: 'Genera
       .filter(item => !isNaN(item.publishedAt.getTime()))
       .slice(0, 10); // newest 10 per feed so one blog can't flood the list
   } catch (error: any) {
-    console.error(`Feed error [${feed.name}]: ${error.message}`);
+    const cause = error?.cause?.code || error?.cause?.message || '';
+    console.error(`Feed error [${feed.name}]: ${error.message} ${cause}`);
     return [];
   }
 }
@@ -115,7 +116,8 @@ async function scrapeAnthropic(): Promise<NewsItem[]> {
     }
     return items.slice(0, 15);
   } catch (error: any) {
-    console.error(`Anthropic scrape error: ${error.message}`);
+    const cause = error?.cause?.code || error?.cause?.message || '';
+    console.error(`Anthropic scrape error: ${error.message} ${cause}`);
     return [];
   }
 }
@@ -125,5 +127,16 @@ export async function getBlogNews(): Promise<NewsItem[]> {
     Promise.all(BLOG_FEEDS.map(fetchRssFeed)),
     scrapeAnthropic(),
   ]);
-  return [...rssResults.flat(), ...anthropicNews];
+
+  // Anthropic has no official RSS. If the direct scrape is blocked, try an RSSHub route.
+  const anthropicItems =
+    anthropicNews.length > 0
+      ? anthropicNews
+      : await fetchRssFeed({
+          name: 'Anthropic',
+          url: 'https://rsshub.app/anthropic/news',
+          category: 'General',
+        });
+
+  return [...rssResults.flat(), ...anthropicItems];
 }
