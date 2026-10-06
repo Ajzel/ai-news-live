@@ -2,79 +2,128 @@ import Parser from 'rss-parser';
 import * as cheerio from 'cheerio';
 import { NewsItem } from '../lib/types';
 import { fetchWithTimeout } from '../lib/fetch-utils';
-import { NewsItemSchema } from '../lib/validation';
 
 const parser = new Parser();
 
+const BROWSER_HEADERS = {
+  'User-Agent':
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+  Accept: 'application/rss+xml, application/xml, text/xml, text/html;q=0.8, */*;q=0.5',
+  'Accept-Language': 'en-US,en;q=0.9',
+};
+
 const BLOG_FEEDS = [
   { name: 'OpenAI', url: 'https://openai.com/news/rss.xml', category: 'General' as const },
-  { name: 'Anthropic', url: 'https://www.anthropic.com/news', category: 'General' as const }, // This one might need scraping
   { name: 'Google DeepMind', url: 'https://deepmind.google/blog/rss.xml', category: 'General' as const },
+  { name: 'Hugging Face', url: 'https://huggingface.co/blog/feed.xml', category: 'General' as const },
+  { name: 'NVIDIA', url: 'https://blogs.nvidia.com/feed/', category: 'General' as const },
+  { name: 'AWS Machine Learning', url: 'https://aws.amazon.com/blogs/machine-learning/feed/', category: 'General' as const },
 ];
 
-async function fetchRssFeed(feed: { name: string; url: string; category: any }): Promise<NewsItem[]> {
+async function fetchRssFeed(feed: { name: string; url: string; category: 'General' }): Promise<NewsItem[]> {
   try {
-    // Note: rss-parser doesn't use native fetch directly for everything,
-    // but we can use our timeout logic for the raw fetch if needed.
-    // For simplicity, we trust rss-parser's internal fetch or can wrap it.
-    const feedData = await parser.parseURL(feed.url);
-    return feedData.items.map(item => ({
-      id: `blog-${feed.name}-${item.guid || item.link}`,
-      title: item.title || 'No Title',
-      summary: item.contentSnippet || item.content || '',
-      url: item.link || '',
-      source: 'blog',
-      sourceName: feed.name,
-      publishedAt: new Date(item.pubDate || Date.now()),
-      category: feed.category,
-    }));
-  } catch (error) {
-    console.error(`Error fetching RSS feed for ${feed.name}:`, error);
+    const res = await fetchWithTimeout(feed.url, { headers: BROWSER_HEADERS });
+    if (!res.ok) {
+      console.error(`Feed error [${feed.name}]: HTTP ${res.status}`);
+      return [];
+    }
+    const xml = (await res.text()).trim();
+    if (!xml.startsWith('<?xml') && !xml.startsWith('<rss') && !xml.startsWith('<feed')) {
+      console.error(`Feed error [${feed.name}]: response was not XML (likely a bot-check page)`);
+      return [];
+    }
+
+    const feedData = await parser.parseString(xml);
+    return feedData.items
+      .filter(item => item.title && item.link)
+      .map(item => ({
+        id: `blog-${feed.name}-${item.guid || item.link}`,
+        title: item.title as string,
+        summary: item.contentSnippet || item.content || '',
+        url: item.link as string,
+        source: 'blog' as const,
+        sourceName: feed.name,
+        publishedAt: new Date(item.isoDate || item.pubDate || Date.now()),
+        category: feed.category,
+      }))
+      .filter(item => !isNaN(item.publishedAt.getTime()))
+      .slice(0, 10); // newest 10 per feed so one blog can't flood the list
+  } catch (error: any) {
+    console.error(`Feed error [${feed.name}]: ${error.message}`);
     return [];
   }
 }
 
+const DATE_RE = /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.? \d{1,2}, \d{4}/;
+
 async function scrapeAnthropic(): Promise<NewsItem[]> {
   try {
-    const response = await fetchWithTimeout('https://www.anthropic.com/news');
-    const data = await response.text();
-    const $ = cheerio.load(data);
+    const res = await fetchWithTimeout('https://www.anthropic.com/news', { headers: BROWSER_HEADERS });
+    if (!res.ok) {
+      console.error(`Anthropic scrape: HTTP ${res.status}`);
+      return [];
+    }
+    const $ = cheerio.load(await res.text());
+    const seen = new Set<string>();
     const items: NewsItem[] = [];
 
-    $('a.news-card').each((_, el) => {
-      const title = $(el).find('h3').text().trim();
-      const url = 'https://www.anthropic.com' + $(el).attr('href');
-      const summary = $(el).find('p').text().trim();
+    $('a[href^="/news/"]').each((_, el) => {
+      const href = ($(el).attr('href') || '').split('?')[0];
+      if (!href || href === '/news/' || href === '/news') return;
 
-      if (title && url) {
-        items.push({
-          id: `blog-anthropic-${url}`,
-          title,
-          summary,
-          url,
-          source: 'blog',
-          sourceName: 'Anthropic',
-          publishedAt: new Date(),
-          category: 'General',
-        });
-      }
+      const url = `https://www.anthropic.com${href}`;
+      if (seen.has(url)) return;
+
+      const fullText = $(el).text().replace(/\s+/g, ' ').trim();
+      const dateMatch = fullText.match(DATE_RE);
+
+      // Category, title, summary and date are separate elements inside the card.
+      // Read each one on its own so the category label isn't glued onto the title.
+      const parts = $(el)
+        .find('*')
+        .filter((_, c) => $(c).children().length === 0)
+        .map((_, c) => $(c).text().replace(/\s+/g, ' ').trim())
+        .get()
+        .filter(Boolean);
+
+      const candidates = parts
+        .filter(p => !DATE_RE.test(p))
+        .sort((a, b) => b.length - a.length);
+
+      const title = candidates[0] || fullText.replace(DATE_RE, '').trim();
+      if (title.length < 10) return;
+      const summary = candidates[1] && candidates[1].length > 40 ? candidates[1] : '';
+
+      const datetimeAttr = $(el).find('time').attr('datetime');
+      const published = new Date(datetimeAttr || (dateMatch ? dateMatch[0] : Date.now()));
+
+      seen.add(url);
+      items.push({
+        id: `blog-anthropic-${url}`,
+        title,
+        summary,
+        url,
+        source: 'blog',
+        sourceName: 'Anthropic',
+        publishedAt: isNaN(published.getTime()) ? new Date() : published,
+        category: 'General',
+      });
     });
-    return items;
-  } catch (error) {
-    console.error('Error scraping Anthropic:', error);
+
+    if (items.length === 0) {
+      console.warn('Anthropic scrape found no articles; the page markup may have changed');
+    }
+    return items.slice(0, 15);
+  } catch (error: any) {
+    console.error(`Anthropic scrape error: ${error.message}`);
     return [];
   }
 }
 
 export async function getBlogNews(): Promise<NewsItem[]> {
-  const rssPromises = BLOG_FEEDS
-    .filter(f => f.url.endsWith('.xml'))
-    .map(fetchRssFeed);
-
-  const [rssNews, anthropicNews] = await Promise.all([
-    Promise.all(rssPromises).then(results => results.flat()),
+  const [rssResults, anthropicNews] = await Promise.all([
+    Promise.all(BLOG_FEEDS.map(fetchRssFeed)),
     scrapeAnthropic(),
   ]);
-
-  return [...rssNews, ...anthropicNews];
+  return [...rssResults.flat(), ...anthropicNews];
 }
