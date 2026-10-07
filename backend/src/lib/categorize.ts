@@ -1,34 +1,95 @@
 import { NewsItem } from './types';
 
 type Category = NewsItem['category'];
+type Scored = Exclude<Category, 'General'>;
 
-// Checked in order; the first match wins. Anything unmatched stays "General".
-const RULES: { category: Category; pattern: RegExp }[] = [
-  {
-    category: 'Ethics',
-    pattern:
-      /\b(ethic|bias|fairness|safety|alignment|regulat|policy|privacy|copyright|watermark|provenance|governance|misinformation|deepfake|lawsuit|responsible ai|surveillance)/i,
-  },
-  {
-    category: 'Robotics',
-    pattern:
-      /\b(robot|humanoid|drone|embodied|self-driving|autonomous vehicle|manipulation|quadruped|actuator)/i,
-  },
-  {
-    category: 'LLM',
-    pattern:
-      /\b(llm|language model|gpt|claude|gemini|llama|mistral|transformer|chatbot|fine-tun|prompt|reasoning|agentic|agent|diffusion|multimodal|token|rag)\b|\b(retrieval)/i,
-  },
-];
+const KEYWORDS: Record<Scored, RegExp[]> = {
+  Ethics: [
+    /\bethic/i,
+    /\bbias(es|ed)?\b/i,
+    /\bfairness\b/i,
+    /\bsafety\b/i,
+    /\balignment\b/i,
+    /\bregulat/i,
+    /\blegislat/i,
+    /\bai act\b/i,
+    /\bprivacy\b/i,
+    /\bcopyright/i,
+    /\bwatermark/i,
+    /\bprovenance\b/i,
+    /\bgovernance\b/i,
+    /\bmisinformation\b/i,
+    /\bdeepfake/i,
+    /\blawsuit/i,
+    /\bresponsible ai\b/i,
+    /\bsurveillance\b/i,
+    /\bhack(ed|ing|s)?\b/i,
+    /\bmisuse\b/i,
+    /\bjailbreak/i,
+    /\bprompt injection\b/i,
+  ],
+  Robotics: [
+    /\brobot/i,
+    /\bhumanoid/i,
+    /\bdrones?\b/i,
+    /\bembodied\b/i,
+    /\bself-driving\b/i,
+    /\bautonomous (vehicles?|driving)\b/i,
+    /\bmanipulation\b/i,
+    /\bquadruped/i,
+    /\bactuator/i,
+    /\bgrasp/i,
+    /\blocomotion\b/i,
+  ],
+  LLM: [
+    /\bllms?\b/i,
+    /\blanguage models?\b/i,
+    /\bfoundation models?\b/i,
+    /\bgpt/i,
+    /\bchatgpt\b/i,
+    /\bclaude\b/i,
+    /\bgemini\b/i,
+    /\bgemma\b/i,
+    /\bllama\b/i,
+    /\bmistral\b/i,
+    /\btransformers?\b/i,
+    /\bchatbots?\b/i,
+    /\bfine-?tun/i,
+    /\bprompt(s|ing)?\b/i,
+    /\breasoning\b/i,
+    /\bagent/i,
+    /\bmultimodal\b/i,
+    /\bembedding/i,
+    /\bretrieval\b/i,
+    /\brag\b/i,
+    /\bcopilot\b/i,
+    /\bgenerative ai\b/i,
+  ],
+};
+
+// Tie-break order: the first category listed wins a tie.
+const PRIORITY: Scored[] = ['Ethics', 'Robotics', 'LLM'];
+
+function score(text: string, patterns: RegExp[]): number {
+  let hits = 0;
+  for (const pattern of patterns) {
+    if (pattern.test(text)) hits++;
+  }
+  return hits;
+}
 
 export function categorize(title: string, summary = ''): Category {
-  // Try the title alone first (more precise), then title plus summary.
-  for (const text of [title, `${title} ${summary}`]) {
-    for (const rule of RULES) {
-      if (rule.pattern.test(text)) return rule.category;
+  let best: Category = 'General';
+  let bestScore = 0;
+
+  for (const category of PRIORITY) {
+    const total = score(title, KEYWORDS[category]) * 3 + score(summary, KEYWORDS[category]);
+    if (total > bestScore) {
+      best = category;
+      bestScore = total;
     }
   }
-  return 'General';
+  return best;
 }
 
 export function withCategory<T extends NewsItem>(item: T): T {
