@@ -18,15 +18,20 @@ export default function NewsCard({ item }: { item: NewsItem }) {
           {new Date(item.publishedAt).toLocaleDateString('en-US')}
         </span>
       </div>
-      <h3 className="text-lg font-semibold mb-2">
-        <a href={item.url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors">
+      <h3 className="text-lg font-semibold mb-2 text-gray-900">
+        <a
+          href={item.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-gray-900 hover:text-blue-600 transition-colors"
+        >
           {item.title}
         </a>
       </h3>
       <p className="text-sm text-gray-600 line-clamp-3 mb-4">
         {item.summary}
       </p>
-      {item.engagement && (
+      {item.engagement != null && item.engagement > 0 && (
         <div className="text-xs text-gray-400 flex items-center">
           <span className="mr-1">🔥</span> {item.engagement} engagements
         </div>
