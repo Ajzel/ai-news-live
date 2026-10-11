@@ -12,3 +12,10 @@ export interface NewsItem {
   category: NewsCategory;
   engagement?: number;
 }
+
+export interface NotificationPrefs {
+  enabled: boolean;
+  categories: NewsCategory[];
+  sources: NewsSource[];
+  keywords: string[];
+}

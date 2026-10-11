@@ -8,6 +8,8 @@ import FilterBar from './FilterBar';
 import LiveIndicator from './LiveIndicator';
 import { createClient } from '@/lib/supabase';
 import { BACKEND_URL } from '@/lib/config';
+import NotificationSettings from './NotificationSettings';
+import { useNotificationPrefs, useNewsNotifications } from '@/lib/useNotifications';
 
 const fetcher = (url: string) => fetch(url).then(res => res.json());
 
@@ -21,6 +23,8 @@ export default function Feed({ initialData }: { initialData: NewsItem[] }) {
   const [categoryFilter, setCategoryFilter] = useState<NewsCategory | 'all'>('all');
   const [user, setUser] = useState<any>(null);
   const supabase = createClient();
+  const { prefs, save, error: prefsError } = useNotificationPrefs(user?.id);
+  useNewsNotifications(user?.id, data, prefs);
 
   useEffect(() => {
     const getUser = async () => {
@@ -52,6 +56,7 @@ export default function Feed({ initialData }: { initialData: NewsItem[] }) {
         <div>
           {user ? (
             <div className="flex items-center gap-3">
+              <NotificationSettings prefs={prefs} save={save} error={prefsError} />
               <span className="text-sm text-gray-600 hidden sm:inline">{user.email}</span>
               <button
                 onClick={() => supabase.auth.signOut()}
