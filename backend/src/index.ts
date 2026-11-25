@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { Redis } from '@upstash/redis';
 import { Ratelimit } from '@upstash/ratelimit';
 import { consolidateNews } from './scrapers/consolidate';
+import { cachedAsync } from './lib/cache';
 
 dotenv.config();
 
@@ -41,10 +42,14 @@ const rateLimitMiddleware = async (req: Request, res: Response, next: NextFuncti
   }
 };
 
+// Scraping every source takes seconds, so serve a cached copy and refresh it
+// in the background every 5 minutes.
+const getNews = cachedAsync(consolidateNews, 5 * 60 * 1000);
+
 // News endpoint
 app.get('/news', rateLimitMiddleware, async (req, res) => {
   try {
-    const news = await consolidateNews();
+    const news = await getNews();
     res.json(news);
   } catch (error) {
     console.error('Error fetching news:', error);
@@ -59,4 +64,5 @@ app.get('/health', (req, res) => {
 
 app.listen(port, () => {
   console.log(`Backend server running on port ${port}`);
+  getNews().catch(err => console.error('Initial news load failed:', err)); // warm the cache
 });
