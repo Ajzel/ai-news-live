@@ -29,7 +29,9 @@ const ratelimit = new Ratelimit({
 });
 
 const rateLimitMiddleware = async (req: Request, res: Response, next: NextFunction) => {
-  const ip = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1';
+  const forwarded = req.headers['x-forwarded-for'];
+  const firstForwarded = (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(',')[0].trim();
+  const ip = firstForwarded || req.socket.remoteAddress || '127.0.0.1';
   try {
     const { success } = await ratelimit.limit(ip);
     if (!success) {
